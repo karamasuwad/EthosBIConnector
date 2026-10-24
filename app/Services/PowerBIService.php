@@ -54,11 +54,38 @@ class PowerBIService
      */
     public function getEmbedConfig(): array
     {
-        $reportId = config('powerbi.report_id');
+        $reportId = null;
         $groupId = config('powerbi.workspace_id');
 
         try {
             $user = auth()->user();
+
+            // The report comes from the BI link assigned to the user
+            $biLink = $user?->biLink;
+
+            $linkFilters = [];
+            $filterPane = true;
+
+            if ($biLink && $biLink->is_active) {
+                [$linkFilters, $filterPane] = $this->parseLinkOptions($biLink->link);
+                [$linkGroupId, $reportId] = $this->parseLink($biLink->link);
+                // Links without a workspace id (reportEmbed URLs): look it up
+                $groupId = $linkGroupId ?: ($reportId ? $this->findWorkspaceForReport($reportId) : null) ?: $groupId;
+
+                if (!$reportId) {
+                    throw new \Exception("The BI link \"{$biLink->name}\" is not a valid Power BI report URL.");
+                }
+            } elseif ($user && $user->is_user) {
+                throw new \Exception('No active BI report is assigned to your account. Contact the administrator.');
+            } else {
+                // Admins without an assigned link use the default report
+                $reportId = config('powerbi.report_id');
+            }
+
+            if (!$reportId || !$groupId) {
+                throw new \Exception('No Power BI report is configured.');
+            }
+
             $slpCode = $user->slpCode ?? null;
 
             if ($user && $user->is_user && !$slpCode) {
@@ -73,12 +100,14 @@ class PowerBIService
 
             if ($reportResponse->failed()) {
                 Log::error('Failed to fetch report details', [
+                    'groupId' => $groupId,
+                    'reportId' => $reportId,
                     'status' => $reportResponse->status(),
                     'error' => $reportResponse->body(),
                 ]);
                 // Token may have been revoked; force a refresh next time
                 Cache::forget('powerbi_service_token');
-                throw new \Exception('Cannot access report: ' . ($reportResponse->json('error.message') ?? 'Unknown error'));
+                throw new \Exception('Cannot access report (' . ($reportResponse->json('error.code') ?? $reportResponse->status()) . '). Check that the service principal is a member of workspace ' . $groupId . ' and the report exists there.');
             }
 
             $report = $reportResponse->json();
@@ -111,15 +140,88 @@ class PowerBIService
                 'embedUrl' => $embedUrl,
                 'reportId' => $reportId,
                 'groupId' => $groupId,
-                'filters' => $slpCode ? [[
+                'filters' => array_merge($linkFilters, $slpCode ? [[
                     'table' => config('powerbi.filter_table'),
                     'column' => config('powerbi.filter_column'),
-                    'value' => $slpCode,
-                ]] : [],
+                    'operator' => 'In',
+                    'values' => [$slpCode],
+                ]] : []),
+                'filterPaneEnabled' => $filterPane,
             ];
         } catch (\Exception $e) {
             Log::error('PowerBI Embed Configuration Error', ['message' => $e->getMessage()]);
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Find which workspace (that the service principal can see) holds a report.
+     */
+    private function findWorkspaceForReport(string $reportId): ?string
+    {
+        return Cache::remember("powerbi_report_group_{$reportId}", now()->addDay(), function () use ($reportId) {
+            $token = $this->getServiceToken();
+            $groups = Http::withToken($token)->timeout(30)->get(self::API . '/groups')->json('value') ?? [];
+
+            foreach ($groups as $group) {
+                if (Http::withToken($token)->timeout(30)->get(self::API . "/groups/{$group['id']}/reports/{$reportId}")->successful()) {
+                    return $group['id'];
+                }
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * Extract [workspaceId, reportId] from a Power BI report URL.
+     * Supports /groups/{id}/reports/{id}, /reports/{id} and ?reportId=&groupId= forms.
+     */
+    private function parseLink(?string $link): array
+    {
+        $guid = '([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})';
+        $link = (string) $link;
+
+        $groupId = preg_match("~/groups/{$guid}~", $link, $m) || preg_match("~[?&]groupId={$guid}~i", $link, $m) ? $m[1] : null;
+        $reportId = preg_match("~/reports/{$guid}~", $link, $m) || preg_match("~[?&]reportId={$guid}~i", $link, $m) ? $m[1] : null;
+
+        return [$groupId, $reportId];
+    }
+
+    /**
+     * Read the options stored in a BI link's query string:
+     *  - filter=Table/Column eq 'Value' [and Table/Column in ('A','B')]  (Power BI URL filter syntax)
+     *  - filterPaneEnabled=false
+     * Returns [filters, filterPaneEnabled].
+     */
+    private function parseLinkOptions(?string $link): array
+    {
+        parse_str((string) parse_url((string) $link, PHP_URL_QUERY), $query);
+
+        $filterPane = strtolower((string) ($query['filterPaneEnabled'] ?? 'true')) !== 'false';
+        $filters = [];
+
+        foreach (preg_split('/\s+and\s+/i', (string) ($query['filter'] ?? '')) as $part) {
+            if (!preg_match("~^\s*([^/]+)/(\S+)\s+(eq|in)\s+(.+?)\s*$~i", $part, $m)) {
+                continue;
+            }
+
+            $values = [];
+            preg_match_all("~'((?:[^']|'')*)'|(-?\d+(?:\.\d+)?)~", $m[4], $vals, PREG_SET_ORDER);
+            foreach ($vals as $v) {
+                $values[] = ($v[1] ?? '') !== '' || !isset($v[2]) ? str_replace("''", "'", $v[1]) : $v[2] + 0;
+            }
+
+            if ($values) {
+                $filters[] = [
+                    'table' => str_replace('_x0020_', ' ', $m[1]),
+                    'column' => str_replace('_x0020_', ' ', $m[2]),
+                    'operator' => 'In',
+                    'values' => $values,
+                ];
+            }
+        }
+
+        return [$filters, $filterPane];
     }
 }

@@ -210,6 +210,7 @@
         const embedUrl = "{{ $embedUrl }}";
         const reportId = "{{ $reportId }}";
         const filters = @json($filters ?? []);
+        const filterPaneEnabled = @json($filterPaneEnabled ?? true);
 
         let isFullscreen = false;
 
@@ -265,8 +266,8 @@
                             table: filter.table,
                             column: filter.column
                         },
-                        operator: "eq",
-                        values: [filter.value]
+                        operator: filter.operator || "In",
+                        values: filter.values || [filter.value]
                     };
                 });
 
@@ -283,7 +284,7 @@
                         panes: {
                             filters: {
                                 expanded: false,
-                                visible: true
+                                visible: filterPaneEnabled
                             },
                             pageNavigation: {
                                 visible: true
@@ -297,7 +298,7 @@
                 window.powerbiReport = powerbi.embed(reportContainer, embedConfig);
 
                 window.powerbiReport.on('loaded', function() {
-                    console.log('✅ Power BI Report loaded successfully with filters');
+                    console.log('Power BI Report loaded successfully with filters');
                     document.getElementById('loading').style.display = 'none';
                     reportContainer.style.display = 'block';
                 });
