@@ -135,6 +135,27 @@ class PowerBIService
                 throw new \Exception('Failed to generate embed token: ' . ($tokenResponse->json('error.message') ?? 'Unknown error'));
             }
 
+            $hasSlpCode   = str_contains($biLink, 'SlpCode');
+            $hasManagerId = str_contains($biLink, 'ManagerId');
+
+            // Only build the extra filter if the URL contains SlpCode/ManagerId AND $slpCode has a value
+            $additionalFilter = ($hasSlpCode || $hasManagerId) && $slpCode ? [[
+                'table' => config('powerbi.filter_table'),
+                'column' => config('powerbi.filter_column'),
+                'operator' => 'In',
+                'values' => [$slpCode],
+            ]] : [];
+
+            return [
+                'embedToken'        => $tokenResponse->json('token'),
+                'embedUrl'          => $embedUrl,
+                'reportId'          => $reportId,
+                'groupId'           => $groupId,
+                'filters'           => array_merge($linkFilters, $additionalFilter),
+                'filterPaneEnabled' => $filterPane,
+            ];
+
+            //old
             return [
                 'embedToken' => $tokenResponse->json('token'),
                 'embedUrl' => $embedUrl,
