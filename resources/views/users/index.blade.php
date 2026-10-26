@@ -49,6 +49,7 @@
         <!-- Users Table -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6 bg-white border-b border-gray-200">
+                @include('partials.table-toolbar', ['placeholder' => 'Search name, email, phone, Slp code or BI link...'])
                 @if($users->count() > 0)
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -129,56 +130,7 @@
                             </tbody>
                         </table>
                     </div>
-                    {{-- Pagination Links --}}
-                    <div class="bg-white px-6 py-4 border-t border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <div class="text-sm text-gray-700">
-                                Showing
-                                <span class="font-medium">{{ $users->firstItem() }}</span>
-                                to
-                                <span class="font-medium">{{ $users->lastItem() }}</span>
-                                of
-                                <span class="font-medium">{{ $users->total() }}</span>
-                                results
-                            </div>
-                            <div class="flex space-x-2">
-                                {{-- Previous Page Link --}}
-                                @if ($users->onFirstPage())
-                                    <span class="px-3 py-1 text-gray-400 bg-gray-100 rounded-md cursor-not-allowed">
-                                        Previous
-                                    </span>
-                                @else
-                                    <a href="{{ $users->previousPageUrl() }}" class="px-3 py-1 text-teal-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                                        Previous
-                                    </a>
-                                @endif
-
-                                {{-- Pagination Elements --}}
-                                @foreach ($users->getUrlRange(1, $users->lastPage()) as $page => $url)
-                                    @if ($page == $users->currentPage())
-                                        <span class="px-3 py-1 text-white bg-teal-600 border border-teal-600 rounded-md">
-                                            {{ $page }}
-                                        </span>
-                                    @else
-                                        <a href="{{ $url }}" class="px-3 py-1 text-teal-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                                            {{ $page }}
-                                        </a>
-                                    @endif
-                                @endforeach
-
-                                {{-- Next Page Link --}}
-                                @if ($users->hasMorePages())
-                                    <a href="{{ $users->nextPageUrl() }}" class="px-3 py-1 text-teal-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                                        Next
-                                    </a>
-                                @else
-                                    <span class="px-3 py-1 text-gray-400 bg-gray-100 rounded-md cursor-not-allowed">
-                                        Next
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+                    @include('partials.pagination', ['paginator' => $users])
                 @else
                     <div class="text-center py-8">
                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

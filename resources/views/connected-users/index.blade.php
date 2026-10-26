@@ -13,7 +13,7 @@
             </div>
             <div class="flex items-center space-x-4">
                 <div class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                    {{ $connectedUsers->count() }} Active
+                    {{ $connectedUsers->total() }} Active
                 </div>
                 <button onclick="refreshPage()" class="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 transition duration-200 flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,7 +37,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Currently Active</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ $connectedUsers->count() }}</dd>
+                                <dd class="text-lg font-medium text-gray-900">{{ $connectedUsers->total() }}</dd>
                             </dl>
                         </div>
                     </div>
@@ -102,6 +102,7 @@
         <!-- Connected Users Table -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6 bg-white border-b border-gray-200">
+                @include('partials.table-toolbar', ['placeholder' => 'Search name, email, phone or BI link...'])
                 @if($connectedUsers->count() > 0)
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -167,6 +168,7 @@
                             </tbody>
                         </table>
                     </div>
+                    @include('partials.pagination', ['paginator' => $connectedUsers])
 
                     <!-- Last Updated -->
                     <div class="mt-4 text-sm text-gray-500 text-center">
@@ -239,7 +241,9 @@ function refreshPage() {
 }
 
 // Auto-refresh every 60 seconds
+// (skipped while the user is typing in the search box)
 setTimeout(() => {
+    if (document.activeElement && document.activeElement.name === 'search') return;
     refreshPage();
 }, 60000);
 </script>

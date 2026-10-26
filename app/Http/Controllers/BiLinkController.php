@@ -14,11 +14,19 @@ class BiLinkController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim((string) $request->query('search'));
+        $perPage = in_array((int) $request->query('per_page'), [10, 25, 50, 100]) ? (int) $request->query('per_page') : 10;
+
         $biLinks = BiLink::where('is_active', true)
+                        ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%")
+                              ->orWhere('link', 'like', "%{$search}%");
+                        }))
                         ->orderBy('created_at', 'desc')
-                        ->get();
+                        ->paginate($perPage)
+                        ->withQueryString();
 
         return view('bi-links.index', compact('biLinks'));
     }

@@ -14,10 +14,22 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // $users = User::with('biLink')->orderBy('created_at', 'desc')->get();
-        $users = User::with('biLink')->paginate(5);
+        $search = trim((string) $request->query('search'));
+        $perPage = in_array((int) $request->query('per_page'), [10, 25, 50, 100]) ? (int) $request->query('per_page') : 10;
+
+        $users = User::with('biLink')
+            ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('telephone', 'like', "%{$search}%")
+                  ->orWhere('slpCode', 'like', "%{$search}%")
+                  ->orWhereHas('biLink', fn ($q) => $q->where('name', 'like', "%{$search}%"));
+            }))
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
         return view('users.index', compact('users'));
     }
 

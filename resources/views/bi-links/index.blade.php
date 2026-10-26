@@ -33,6 +33,7 @@
         <!-- BI Links Table -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6 bg-white border-b border-gray-200">
+                @include('partials.table-toolbar', ['placeholder' => 'Search name or link...'])
                 @if($biLinks->count() > 0)
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -75,6 +76,7 @@
                             </tbody>
                         </table>
                     </div>
+                    @include('partials.pagination', ['paginator' => $biLinks])
                 @else
                     <div class="text-center py-8">
                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

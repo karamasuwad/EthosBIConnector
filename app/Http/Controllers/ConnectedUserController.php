@@ -12,14 +12,24 @@ class ConnectedUserController extends Controller
     /**
      * Display a listing of connected users.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim((string) $request->query('search'));
+        $perPage = in_array((int) $request->query('per_page'), [10, 25, 50, 100]) ? (int) $request->query('per_page') : 10;
+
         // Get users who have logged in recently (last 30 minutes)
         $connectedUsers = User::where('is_active', true)
                             // ->where('last_login_at', '>=', now()->subMinutes(30))
                             ->whereDate('last_login_at', Carbon::today())
+                            ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
+                                $q->where('name', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%")
+                                  ->orWhere('telephone', 'like', "%{$search}%")
+                                  ->orWhere('bi_link_name', 'like', "%{$search}%");
+                            }))
                             ->orderBy('last_login_at', 'desc')
-                            ->get();
+                            ->paginate($perPage)
+                            ->withQueryString();
 
         // Get session data from database (if using database sessions)
         $sessions = [];
