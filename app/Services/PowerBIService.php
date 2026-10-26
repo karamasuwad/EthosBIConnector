@@ -141,7 +141,7 @@ class PowerBIService
             // Only build the extra filter if the URL contains SlpCode/ManagerId AND $slpCode has a value
             $additionalFilter = ($hasSlpCode || $hasManagerId) && $slpCode ? [[
                 'table' => config('powerbi.filter_table'),
-                'column' => config('powerbi.filter_column'),
+                'column' => $hasManagerId === true ? config('powerbi.filter_column') : 'SlpCode',
                 'operator' => 'In',
                 'values' => [$slpCode],
             ]] : [];
